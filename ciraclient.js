@@ -293,6 +293,7 @@ module.exports.CreateCiraClient = function (parent, args) {
                 if (pfwd_ports.indexOf(p_res.target_port) >= 0) {
                     // connect socket to that port
                     obj.downlinks[p_res.sender_chan] = obj.net.createConnection({host: obj.args.target_address, port: p_res.target_port}, function() {
+                        obj.downlinks[p_res.sender_chan].setEncoding('binary');//assume everything is binary, not interpreting
                         SendChannelOpenConfirm(socket, p_res);
                     });
 
@@ -342,7 +343,7 @@ module.exports.CreateCiraClient = function (parent, args) {
                 if (obj.downlinks[rcpt_chan])
                 {
                     try {
-                        obj.downlinks[rcpt_chan].write(chan_data,'binary', function() { 
+                        obj.downlinks[rcpt_chan].write(chan_data,'binary', function() {
                             Debug("Write completed.");
                             SendChannelWindowAdjust(socket,rcpt_chan,8192);//Give me another 8K
                         });                        
