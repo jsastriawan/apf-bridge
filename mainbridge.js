@@ -11,19 +11,50 @@ var obj = {
     ciraclients: []
 };
 
-var args_template = {
-    host: "meshcentral.com",//MPS host
-    port: 4433,//MPS port
-    clientName: 'std-mgblt', // host name, friendly name
-    target_address: '192.168.0.155', //IP address or FQDN or relayed machine
-    uuid: "12345678-9abc-def1-2345-123456789000",//GUID of relayed machine
-    username: 'X0Jwl0BqqAAd0XJX', // mps username, device group id/meshid
-    password: 'P@ssw0rd', // mps password
-    keepalive: 60000 // interval for keepalive ping
+if (process.argv.length <3) {
+    console.log("Configuration file is not found.");
+    console.log("e.g: node mainbridge.js config.json");
+    process.exit();
+}
+
+var config = {};
+try {
+    config = JSON.parse(require("fs").readFileSync(process.argv[2]));
+} catch (e) {
+    console.log(e);
+}
+// correct config must have at least mps object defined
+if (config.mps === undefined) {
+    console.log("Invalid configuration file. Missing MPS settings.")
+    process.exit();
+}
+
+if (config.clients === undefined || config.clients === {}) {
+    console.log("No clients, exitting");
+    process.exit();
+}
+
+// preparing args template
+var args = {
+    mpshost: config.mps.mpshost,
+    mpsport: config.mps.mpsport,
+    mpsuser: config.mps.mpsuser,
+    mpspass: config.mps.mpspass,
+    mpskeepalive: config.mps.mpskeepalive
 };
 
+if (config.proxy && config.proxy !=null) {
+    if (config.proxy.proxytype) { args.proxytype = config.proxy.proxytype; }
+    if (config.proxy.proxyhost) { args.proxyhost = config.proxy.proxyhost; }
+    if (config.proxy.proxyport) { args.proxyport = config.proxy.proxyport; }
+}
 
-obj.ciraclients[0] = require('./ciraclient.js').CreateCiraClient(obj, args_template);
+for (i=0; i<config.clients.length; i++) {
+    args.clientname = config.clients[i].clientname;
+    args.clientaddress = config.clients[i].clientaddress;
+    args.clientuuid = config.clients[i].clientuuid;
+    obj.ciraclients[0] = require('./ciraclient.js').CreateCiraClient(obj, args);
+    obj.ciraclients[0].connect();
+}
 
-obj.ciraclients[0].connect();
 
