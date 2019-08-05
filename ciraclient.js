@@ -344,7 +344,7 @@ module.exports.CreateCiraClient = function (parent, args) {
                     try {
                         obj.downlinks[rcpt_chan].write(chan_data, 'binary', function () {
                             Debug("Write completed.");
-                            SendChannelWindowAdjust(socket, rcpt_chan, 8192);//Give me another 8K
+                            SendChannelWindowAdjust(socket, rcpt_chan, chan_data_len);//I have full window capacity now
                         });
                     } catch (e) {
                         Debug("Cannot forward data to downlink socket.");
