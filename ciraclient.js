@@ -292,10 +292,17 @@ module.exports.CreateCiraClient = function (parent, args) {
                 // Check if target port is in pfwd_ports
                 if (pfwd_ports.indexOf(p_res.target_port) >= 0) {
                     // connect socket to that port
-                    obj.downlinks[p_res.sender_chan] = obj.net.createConnection({ host: obj.args.clientaddress, port: p_res.target_port }, function () {
-                        obj.downlinks[p_res.sender_chan].setEncoding('binary');//assume everything is binary, not interpreting
-                        SendChannelOpenConfirm(socket, p_res);
-                    });
+                    if (obj.args.tlsupgrade && obj.args.tlsupgrade != 0) {
+                        obj.downlinks[p_res.sender_chan] = obj.tls.connect({ host: obj.args.clientaddress, port: p_res.target_port + 1, rejectUnauthorized: false }, function () {
+                            obj.downlinks[p_res.sender_chan].setEncoding('binary');//assume everything is binary, not interpreting
+                            SendChannelOpenConfirm(socket, p_res);
+                        });
+                    } else {
+                        obj.downlinks[p_res.sender_chan] = obj.net.createConnection({ host: obj.args.clientaddress, port: p_res.target_port }, function () {
+                            obj.downlinks[p_res.sender_chan].setEncoding('binary');//assume everything is binary, not interpreting
+                            SendChannelOpenConfirm(socket, p_res);
+                        });
+                    }
 
                     obj.downlinks[p_res.sender_chan].on('data', function (ddata) {
                         //Relay data to fordwardclient

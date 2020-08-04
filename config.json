@@ -13,6 +13,6 @@
         "proxyport": 3128
     }, 
     "clients": [
-        { "clientname": "std-machine-1","clientaddress":"10.2.55.1","clientuuid":"bf49cf00-9164-11e4-952b-b8aeed7ec594"}
+        { "clientname": "std-machine-1","clientaddress":"10.2.55.1","clientuuid":"bf49cf00-9164-11e4-952b-b8aeed7ec594","tlsupgrade":1}
     ]
 }

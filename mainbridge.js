@@ -53,6 +53,11 @@ for (i=0; i<config.clients.length; i++) {
     args.clientname = config.clients[i].clientname;
     args.clientaddress = config.clients[i].clientaddress;
     args.clientuuid = config.clients[i].clientuuid;
+    if (config.clients[i].tlsupgrade) {
+        args.tlsupgrade = config.clients[i].tlsupgrade;
+    } else {
+        delete args.tlsupgrade;
+    }
     obj.ciraclients[0] = require('./ciraclient.js').CreateCiraClient(obj, args);
     obj.ciraclients[0].connect();
 }
