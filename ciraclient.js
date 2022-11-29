@@ -17,6 +17,7 @@ module.exports.CreateCiraClient = function (parent, args) {
     obj.forwardClient = null;
     obj.downlinks = {};
     obj.pfwd_idx = 0;
+    obj.keepalive = obj.args.mpskeepalive
     // keep alive timer
     obj.timer = null;
 
@@ -52,7 +53,7 @@ module.exports.CreateCiraClient = function (parent, args) {
 
 
     // AMT forwarded port list for non-TLS mode
-    var pfwd_ports = [16992, 623, 16994, 5900];
+    var pfwd_ports = [16992, 16993, 623, 16994, 16995, 5900];
     // protocol definitions
     var APFProtocol = {
         UNKNOWN: 0,
@@ -223,6 +224,12 @@ module.exports.CreateCiraClient = function (parent, args) {
         Debug("CIRA: Send keepalive reply");
     }
 
+    function SendKeepAliveOptionsReply(socket, interval, timeout) {
+        var data = String.fromCharCode(APFProtocol.KEEPALIVE_OPTIONS_REPLY)+obj.common.IntToStr(interval)+obj.common.IntToStr(timeout);
+        socket.write(Buffer.from(data,'binary'));
+        Debug("CIRA: Send keepalive options reply");
+    }
+
     function ProcessData(socket) {
         var cmd = socket.tag.accumulator.charCodeAt(0);
         var len = socket.tag.accumulator.length;
@@ -254,10 +261,11 @@ module.exports.CreateCiraClient = function (parent, args) {
                         SendGlobalRequestPfwd(socket, obj.args.clientname, pfwd_ports[obj.pfwd_idx++]);
                     } else {
                         // no more port forward, now setup timer to send keep alive
-                        Debug("CIRA: Start keep alive for every " + obj.args.keepalive + " ms.");
+                        Debug("CIRA: Start keep alive for every " + obj.keepalive + " ms.");
+                        clearInterval(obj.timer)
                         obj.timer = setInterval(function () {
                             SendKeepAliveRequest(obj.forwardClient);
-                        }, obj.args.mpskeepalive);// 
+                        }, obj.keepalive);// 
                     }
                     return 5;
                 }
@@ -283,6 +291,17 @@ module.exports.CreateCiraClient = function (parent, args) {
             case APFProtocol.KEEPALIVE_REPLY: {
                 Debug("CIRA: Keep Alive Reply with cookie: " + obj.common.ReadInt(data, 1));
                 return 5;
+            }
+            case APFProtocol.KEEPALIVE_OPTIONS_REQUEST: {
+                Debug("CIRA: Keep Alive Request with cookie: " + +obj.common.ReadInt(data,1)+", timeout:"+ obj.common.ReadInt(data,5));
+                obj.keepalive = obj.common.ReadInt(data,5)*1000;
+                Debug("CIRA: Update keep alive for every " + obj.keepalive + " ms.");
+                clearInterval(obj.timer);
+                obj.timer = setInterval(function () {
+                    SendKeepAliveRequest(obj.forwardClient);
+                }, obj.keepalive);
+                SendKeepAliveOptionsReply(socket, obj.common.ReadInt(data, 1),obj.common.ReadInt(data,5));
+                return 9;
             }
             // Channel management
             case APFProtocol.CHANNEL_OPEN: {
@@ -311,6 +330,14 @@ module.exports.CreateCiraClient = function (parent, args) {
 
                     obj.downlinks[p_res.sender_chan].on('error', function (e) {
                         Debug("Downlink connection error: " + e);
+                        if (obj.downlinks[p_res.sender_chan]) {
+                            try {
+                                SendChannelClose(socket, p_res.sender_chan);
+                                delete obj.downlinks[p_res.sender_chan];
+                            } catch (e) {
+                                Debug("Downlink connection exception: " + e);
+                            }
+                        }
                     });
 
                     obj.downlinks[p_res.sender_chan].on('end', function () {
@@ -334,8 +361,10 @@ module.exports.CreateCiraClient = function (parent, args) {
             }
             case APFProtocol.CHANNEL_CLOSE: {
                 var rcpt_chan = obj.common.ReadInt(data, 1);
-                Debug("CIRA: CHANNEL_CLOSE: " + rcpt_chan);
-                SendChannelClose(socket, rcpt_chan);
+                if (obj.downlinks[rcpt_chan]!=null) {
+                    Debug("CIRA: CHANNEL_CLOSE: " + rcpt_chan);
+                    SendChannelClose(socket, rcpt_chan);
+                }
                 try {
                     obj.downlinks[rcpt_chan].end();
                     delete obj.downlinks[rcpt_chan];
@@ -442,7 +471,8 @@ module.exports.CreateCiraClient = function (parent, args) {
             secureProtocol: 'SSLv23_method',
             ciphers: 'RSA+AES:!aNULL:!MD5:!DSS',
             secureOptions: obj.constants.SSL_OP_NO_SSLv2 | obj.constants.SSL_OP_NO_SSLv3 | obj.constants.SSL_OP_NO_COMPRESSION | obj.constants.SSL_OP_CIPHER_SERVER_PREFERENCE,
-            rejectUnauthorized: false, enableTrace: true
+            rejectUnauthorized: false, 
+            enableTrace: false
         };
         if (args.proxytype != null) {
             var net = require("net");

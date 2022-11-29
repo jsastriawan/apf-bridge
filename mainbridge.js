@@ -7,7 +7,7 @@
 */
 
 var obj = {
-    debug: true,
+    debug: false,
     ciraclients: []
 };
 
